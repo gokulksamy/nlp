@@ -1,0 +1,31 @@
+import PyPDF2
+import re
+
+def extract_savings_from_pdf(pdf_file_path):
+    # Open the PDF file
+    with open(pdf_file_path, 'rb') as file:
+        # Create a PDF reader object
+        pdf_reader = PyPDF2.PdfFileReader(file)
+        
+        # Initialize variables to store extracted savings
+        total_savings = 0.0
+        
+        # Iterate through each page of the PDF
+        for page_num in range(pdf_reader.numPages):
+            # Extract text from the current page
+            page_text = pdf_reader.getPage(page_num).extractText()
+            
+            # Search for savings keywords using regular expressions
+            savings_matches = re.findall(r'(?:Savings|Total Savings|Net Savings):?\s*\$?(\d+(\.\d+)?)', page_text, re.IGNORECASE)
+            
+            # Iterate through savings matches and add them to total savings
+            for match in savings_matches:
+                savings_amount = float(match[0])
+                total_savings += savings_amount
+                
+        return total_savings
+
+# Example usage:
+pdf_file_path = 'example.pdf'  # Replace 'example.pdf' with the path to your PDF file
+total_savings = extract_savings_from_pdf(pdf_file_path)
+print("Total savings:", total_savings)
