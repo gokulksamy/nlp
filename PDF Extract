@@ -16,3 +16,15 @@ if matches:
     print("End date:", end_date)
 else:
     print("No dates found after the word 'Period' in the string.")
+
+# Regular expression pattern to match the balance amount including the dollar sign
+pattern = r"\$([\d,]+\.\d{2})"
+
+# Finding balance amount using regular expression
+match = re.search(pattern, string)
+
+if match:
+    balance = match.group(0)
+    print("Balance amount including dollar sign:", balance)
+else:
+    print("No balance amount found in the string.")
