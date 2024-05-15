@@ -20,6 +20,27 @@ else:
 # Regular expression pattern to match the balance amount including the dollar sign
 pattern = r"\$([\d,]+\.\d{2})"
 
+# Given string - 3
+string = 'Page ofCommercial Checking with Interest Index'
+
+# List of values to search for
+values_to_search = ['Commercial Checking with Interest', 'Deposit', 'Private Wealth']
+
+# Initialize a list to store matched values
+matched_values = []
+
+# Iterate through the list of values to search
+for value in values_to_search:
+    if value.lower() in string.lower():
+        matched_values.append(value)
+
+# Print matched values
+if matched_values:
+    print("Matched values:", matched_values)
+else:
+    print("No values from the list found in the string.")
+
+
 # Finding balance amount using regular expression
 match = re.search(pattern, string)
 
