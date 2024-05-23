@@ -1,51 +1,47 @@
-import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+import string
 
-# Given string
-string = "String : Columbus OH 4312 - 1025For the Period 3/1/24 to 3/31/24"
+# Download necessary NLTK data files
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
 
-# Regular expression pattern to match dates after the word "Period"
-pattern = r"Period (\d{1,2}/\d{1,2}/\d{2,4}) to (\d{1,2}/\d{1,2}/\d{2,4})"
+# Initialize the stemmer and lemmatizer
+stemmer = PorterStemmer()
+lemmatizer = WordNetLemmatizer()
 
-# Finding dates using regular expression
-matches = re.search(pattern, string)
+# Function to preprocess text
+def preprocess_text(text):
+    # Lowercasing
+    text = text.lower()
+    
+    # Removing punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    
+    # Tokenization
+    words = word_tokenize(text)
+    
+    # Removing stopwords
+    stop_words = set(stopwords.words('english'))
+    words = [word for word in words if word not in stop_words]
+    
+    # Stemming
+    words_stemmed = [stemmer.stem(word) for word in words]
+    
+    # Lemmatization
+    words_lemmatized = [lemmatizer.lemmatize(word) for word in words_stemmed]
+    
+    # Join words back to a single string
+    preprocessed_text = ' '.join(words_lemmatized)
+    
+    return preprocessed_text
 
-if matches:
-    start_date = matches.group(1)
-    end_date = matches.group(2)
-    print("Start date:", start_date)
-    print("End date:", end_date)
-else:
-    print("No dates found after the word 'Period' in the string.")
-
-# Regular expression pattern to match the balance amount including the dollar sign
-pattern = r"\$([\d,]+\.\d{2})"
-
-# Given string - 3
-string = 'Page ofCommercial Checking with Interest Index'
-
-# List of values to search for
-values_to_search = ['Commercial Checking with Interest', 'Deposit', 'Private Wealth']
-
-# Initialize a list to store matched values
-matched_values = []
-
-# Iterate through the list of values to search
-for value in values_to_search:
-    if value.lower() in string.lower():
-        matched_values.append(value)
-
-# Print matched values
-if matched_values:
-    print("Matched values:", matched_values)
-else:
-    print("No values from the list found in the string.")
-
-
-# Finding balance amount using regular expression
-match = re.search(pattern, string)
-
-if match:
-    balance = match.group(0)
-    print("Balance amount including dollar sign:", balance)
-else:
-    print("No balance amount found in the string.")
+# Example usage
+if __name__ == "__main__":
+    text = "The company's revenue for the first quarter increased significantly compared to the previous year."
+    preprocessed_text = preprocess_text(text)
+    print(f"Preprocessed text: {preprocessed_text}")
