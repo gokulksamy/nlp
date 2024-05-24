@@ -1,47 +1,21 @@
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer, WordNetLemmatizer
-import string
+import torch
+from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import TextClassificationPipeline
 
-# Download necessary NLTK data files
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+# Load pre-trained FinBERT model and tokenizer
+model_name = "yiyanghkust/finbert-tone"
+tokenizer = BertTokenizer.from_pretrained(model_name)
+model = BertForSequenceClassification.from_pretrained(model_name)
 
-# Initialize the stemmer and lemmatizer
-stemmer = PorterStemmer()
-lemmatizer = WordNetLemmatizer()
+# Initialize the text classification pipeline
+finbert_pipeline = TextClassificationPipeline(model=model, tokenizer=tokenizer, return_all_scores=True)
 
-# Function to preprocess text
-def preprocess_text(text):
-    # Lowercasing
-    text = text.lower()
-    
-    # Removing punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    
-    # Tokenization
-    words = word_tokenize(text)
-    
-    # Removing stopwords
-    stop_words = set(stopwords.words('english'))
-    words = [word for word in words if word not in stop_words]
-    
-    # Stemming
-    words_stemmed = [stemmer.stem(word) for word in words]
-    
-    # Lemmatization
-    words_lemmatized = [lemmatizer.lemmatize(word) for word in words_stemmed]
-    
-    # Join words back to a single string
-    preprocessed_text = ' '.join(words_lemmatized)
-    
-    return preprocessed_text
+def analyze_financial_sentiment(text):
+    results = finbert_pipeline(text)
+    return results
 
 # Example usage
 if __name__ == "__main__":
-    text = "The company's revenue for the first quarter increased significantly compared to the previous year."
-    preprocessed_text = preprocess_text(text)
-    print(f"Preprocessed text: {preprocessed_text}")
+    financial_statement = "The company's revenue has increased by 20% in the last quarter, outperforming the market expectations."
+    sentiment_results = analyze_financial_sentiment(financial_statement)
+    print(sentiment_results)
