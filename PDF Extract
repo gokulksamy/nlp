@@ -1,14 +1,14 @@
-import torch
-from transformers import BertTokenizer, BertForSequenceClassification
-from transformers import TextClassificationPipeline
+import tensorflow as tf
+from transformers import BertTokenizer, TFBertForSequenceClassification
+from transformers import pipeline
 
 # Load pre-trained FinBERT model and tokenizer
 model_name = "yiyanghkust/finbert-tone"
 tokenizer = BertTokenizer.from_pretrained(model_name)
-model = BertForSequenceClassification.from_pretrained(model_name)
+model = TFBertForSequenceClassification.from_pretrained(model_name)
 
 # Initialize the text classification pipeline
-finbert_pipeline = TextClassificationPipeline(model=model, tokenizer=tokenizer, return_all_scores=True)
+finbert_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer, return_all_scores=True, framework="tf")
 
 def analyze_financial_sentiment(text):
     results = finbert_pipeline(text)
