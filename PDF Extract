@@ -1,21 +1,4 @@
-import tensorflow as tf
-from transformers import BertTokenizer, TFBertForSequenceClassification
-from transformers import pipeline
-
-# Load pre-trained FinBERT model and tokenizer
-model_name = "yiyanghkust/finbert-tone"
-tokenizer = BertTokenizer.from_pretrained(model_name)
-model = TFBertForSequenceClassification.from_pretrained(model_name)
-
-# Initialize the text classification pipeline
-finbert_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer, return_all_scores=True, framework="tf")
-
-def analyze_financial_sentiment(text):
-    results = finbert_pipeline(text)
-    return results
-
-# Example usage
-if __name__ == "__main__":
-    financial_statement = "The company's revenue has increased by 20% in the last quarter, outperforming the market expectations."
-    sentiment_results = analyze_financial_sentiment(financial_statement)
-    print(sentiment_results)
+  # Remove disclaimer keywords
+  disclaimer_keywords = ["forward-looking statements", "disclaimer", "no assurances"]
+  filtered_sentences = [sentence for sentence in lowercase_sentences 
+                         if not any(keyword in sentence for keyword in disclaimer_keywords)]
