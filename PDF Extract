@@ -2,48 +2,26 @@ import pdfplumber
 import pandas as pd
 import re
 
-# Function to extract tables and their preceding text from a PDF
+# Function to extract tables and associated text
 def extract_tables_with_text(pdf_path):
+    tables_with_text = []
     with pdfplumber.open(pdf_path) as pdf:
-        all_data = []
         for page in pdf.pages:
-            # Extract text from the page
-            page_text = page.extract_text()
-            # Extract tables from the page
+            text = page.extract_text()
             tables = page.extract_tables()
+            if text and tables:
+                # Find lines starting with 23MY or 24MY
+                matches = re.findall(r'^(23MY|24MY).*$', text, re.MULTILINE)
+                for match in matches:
+                    for table in tables:
+                        tables_with_text.append((match, table))
+    return tables_with_text
 
-            if page_text and tables:
-                # Split the text into lines
-                lines = page_text.split('\n')
-                for i, table in enumerate(tables):
-                    # Assuming the table name is the last non-empty line before the table
-                    table_name = None
-                    for line in reversed(lines):
-                        if line.strip():
-                            table_name = line.strip()
-                            break
+# Example usage
+pdf_path = "path_to_your_pdf_file.pdf"
+tables_with_text = extract_tables_with_text(pdf_path)
 
-                    # Create a DataFrame from the table
-                    df = pd.DataFrame(table[1:], columns=table[0])
-                    all_data.append((table_name, df))
-                    
-                    # Remove used lines to avoid using the same name for the next table
-                    lines = lines[:-len(table)]
-
-        return all_data
-
-# Path to your PDF file
-pdf_path = 'path_to_your_file.pdf'
-
-# Extract tables and their names
-tables_with_names = extract_tables_with_text(pdf_path)
-
-# Print the results
-for name, df in tables_with_names:
-    print(f"Table Name: {name}")
-    print(df)
-    print("\n")
-
-# You can also save these tables to separate files if needed
-for name, df in tables_with_names:
-    df.to_csv(f"{name}.csv", index=False)
+# Convert extracted tables to dataframes and save them with appropriate names
+for idx, (name, table) in enumerate(tables_with_text):
+    df = pd.DataFrame(table[1:], columns=table[0])  # Assuming first row is the header
+    df.to_csv(f"{name}_table_{idx}.csv", index=False)
