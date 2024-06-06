@@ -2,26 +2,42 @@ import pdfplumber
 import pandas as pd
 import re
 
-# Function to extract tables and associated text
-def extract_tables_with_text(pdf_path):
-    tables_with_text = []
+# Function to extract tables and text from PDF
+def extract_tables_and_text(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
+        tables = []
         for page in pdf.pages:
             text = page.extract_text()
-            tables = page.extract_tables()
-            if text and tables:
-                # Find lines starting with 23MY or 24MY
-                matches = re.findall(r'^(23MY|24MY).*$', text, re.MULTILINE)
-                for match in matches:
-                    for table in tables:
-                        tables_with_text.append((match, table))
-    return tables_with_text
+            page_tables = page.extract_tables()
+            tables.append((text, page_tables))
+    return tables
 
-# Example usage
-pdf_path = "path_to_your_pdf_file.pdf"
-tables_with_text = extract_tables_with_text(pdf_path)
+# Function to extract dataframe names and assign to tables
+def process_tables(tables):
+    dataframes = {}
+    for page_text, page_tables in tables:
+        lines = page_text.split('\n')
+        for i, line in enumerate(lines):
+            if re.match(r'^(23MY|24MY)', line):
+                df_name = line.strip()
+                if i+1 < len(lines):
+                    for table in page_tables:
+                        df = pd.DataFrame(table[1:], columns=table[0])
+                        dataframes[df_name] = df
+                        break
+    return dataframes
 
-# Convert extracted tables to dataframes and save them with appropriate names
-for idx, (name, table) in enumerate(tables_with_text):
-    df = pd.DataFrame(table[1:], columns=table[0])  # Assuming first row is the header
-    df.to_csv(f"{name}_table_{idx}.csv", index=False)
+# Path to the PDF file
+pdf_path = 'your_pdf_file.pdf'
+
+# Extract tables and text
+tables_and_text = extract_tables_and_text(pdf_path)
+
+# Process tables to get named dataframes
+named_dataframes = process_tables(tables_and_text)
+
+# Display the named dataframes
+for name, df in named_dataframes.items():
+    print(f"DataFrame Name: {name}")
+    print(df)
+    print("\n")
