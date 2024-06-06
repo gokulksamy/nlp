@@ -1,119 +1,44 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Embedding, LSTM, Dense, Input
-from tensorflow.keras.models import Model
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-import numpy as np
+import fitz  # PyMuPDF
+import pandas as pd
+import camelot
 
-# Hyperparameters
-embedding_dim = 256
-units = 512
-batch_size = 64
-epochs = 20
-max_len_input = 100  # Maximum length of input sequences
-max_len_output = 50  # Maximum length of output sequences
+# Open the PDF file
+pdf_path = "path_to_your_file.pdf"
+pdf_document = fitz.open(pdf_path)
 
-# Sample data (dummy data)
-input_texts = ["This is a sample input text.", "Another example of input text."]
-output_texts = ["Sample summary.", "Example summary."]
+# Initialize an empty list to hold the text and table data
+data = []
 
-# Tokenization and padding
-tokenizer_inputs = Tokenizer()
-tokenizer_outputs = Tokenizer()
+# Iterate through each page in the PDF
+for page_num in range(len(pdf_document)):
+    page = pdf_document.load_page(page_num)
+    text = page.get_text("text")
+    
+    # Extract tables using Camelot
+    tables = camelot.read_pdf(pdf_path, pages=str(page_num+1))
+    
+    # Find the position of each table in the text
+    for i, table in enumerate(tables):
+        table_df = table.df  # Convert table to DataFrame
+        table_area = table._bbox  # Bounding box of the table
+        text_above_table = ""
+        
+        # Extract text above the table
+        for line in text.split('\n'):
+            bbox = page.search_for(line)
+            if bbox and bbox[0][3] < table_area[1]:  # Check if the line is above the table
+                text_above_table += line + "\n"
+        
+        # Extract the last line before the table as the table name
+        table_name = text_above_table.strip().split('\n')[-1]
+        
+        data.append((table_name, table_df))
 
-tokenizer_inputs.fit_on_texts(input_texts)
-tokenizer_outputs.fit_on_texts(output_texts)
+# Convert to a dictionary of DataFrames
+tables_dict = {item[0]: item[1] for item in data}
 
-input_sequences = tokenizer_inputs.texts_to_sequences(input_texts)
-output_sequences = tokenizer_outputs.texts_to_sequences(output_texts)
-
-input_sequences = pad_sequences(input_sequences, maxlen=max_len_input, padding='post')
-output_sequences = pad_sequences(output_sequences, maxlen=max_len_output, padding='post')
-
-vocab_size_input = len(tokenizer_inputs.word_index) + 1
-vocab_size_output = len(tokenizer_outputs.word_index) + 1
-
-# Define the encoder
-encoder_inputs = Input(shape=(max_len_input,))
-encoder_embedding = Embedding(vocab_size_input, embedding_dim)(encoder_inputs)
-encoder_lstm = LSTM(units, return_state=True)
-encoder_outputs, state_h, state_c = encoder_lstm(encoder_embedding)
-encoder_states = [state_h, state_c]
-
-# Define the decoder
-decoder_inputs = Input(shape=(max_len_output,))
-decoder_embedding = Embedding(vocab_size_output, embedding_dim)(decoder_inputs)
-decoder_lstm = LSTM(units, return_sequences=True, return_state=True)
-decoder_outputs, _, _ = decoder_lstm(decoder_embedding, initial_state=encoder_states)
-decoder_dense = Dense(vocab_size_output, activation='softmax')
-decoder_outputs = decoder_dense(decoder_outputs)
-
-# Define the model
-model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
-
-# Compile the model
-model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-
-# Prepare the target data for training (teacher forcing)
-output_sequences_input = output_sequences[:, :-1]
-output_sequences_target = output_sequences[:, 1:]
-output_sequences_target = np.expand_dims(output_sequences_target, -1)
-
-# Train the model
-model.fit([input_sequences, output_sequences_input], output_sequences_target,
-          batch_size=batch_size, epochs=epochs)
-
-# Save the model
-model.save('abstractive_summarization_model.h5')
-
-# Inference models
-# Define the encoder model
-encoder_model = Model(encoder_inputs, encoder_states)
-
-# Define the decoder model
-decoder_state_input_h = Input(shape=(units,))
-decoder_state_input_c = Input(shape=(units,))
-decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
-
-decoder_outputs, state_h, state_c = decoder_lstm(
-    decoder_embedding, initial_state=decoder_states_inputs)
-decoder_states = [state_h, state_c]
-decoder_outputs = decoder_dense(decoder_outputs)
-
-decoder_model = Model(
-    [decoder_inputs] + decoder_states_inputs,
-    [decoder_outputs] + decoder_states)
-
-# Function to generate summaries
-def decode_sequence(input_seq):
-    states_value = encoder_model.predict(input_seq)
-
-    target_seq = np.zeros((1, 1))
-    target_seq[0, 0] = tokenizer_outputs.word_index['start']
-
-    stop_condition = False
-    decoded_sentence = ''
-    while not stop_condition:
-        output_tokens, h, c = decoder_model.predict(
-            [target_seq] + states_value)
-
-        sampled_token_index = np.argmax(output_tokens[0, -1, :])
-        sampled_token = tokenizer_outputs.index_word[sampled_token_index]
-        decoded_sentence += ' ' + sampled_token
-
-        if sampled_token == 'end' or len(decoded_sentence.split()) > max_len_output:
-            stop_condition = True
-
-        target_seq = np.zeros((1, 1))
-        target_seq[0, 0] = sampled_token_index
-
-        states_value = [h, c]
-
-    return decoded_sentence
-
-# Example usage
-for seq_index in range(len(input_texts)):
-    input_seq = input_sequences[seq_index: seq_index + 1]
-    decoded_sentence = decode_sequence(input_seq)
-    print(f"Input: {input_texts[seq_index]}")
-    print(f"Predicted summary: {decoded_sentence}")
+# Example of accessing a table by its name
+for table_name, table_df in tables_dict.items():
+    print(f"Table Name: {table_name}")
+    print(table_df)
+    print("\n")
