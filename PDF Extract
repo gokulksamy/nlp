@@ -1,44 +1,49 @@
-import fitz  # PyMuPDF
+import pdfplumber
 import pandas as pd
-import camelot
+import re
 
-# Open the PDF file
-pdf_path = "path_to_your_file.pdf"
-pdf_document = fitz.open(pdf_path)
+# Function to extract tables and their preceding text from a PDF
+def extract_tables_with_text(pdf_path):
+    with pdfplumber.open(pdf_path) as pdf:
+        all_data = []
+        for page in pdf.pages:
+            # Extract text from the page
+            page_text = page.extract_text()
+            # Extract tables from the page
+            tables = page.extract_tables()
 
-# Initialize an empty list to hold the text and table data
-data = []
+            if page_text and tables:
+                # Split the text into lines
+                lines = page_text.split('\n')
+                for i, table in enumerate(tables):
+                    # Assuming the table name is the last non-empty line before the table
+                    table_name = None
+                    for line in reversed(lines):
+                        if line.strip():
+                            table_name = line.strip()
+                            break
 
-# Iterate through each page in the PDF
-for page_num in range(len(pdf_document)):
-    page = pdf_document.load_page(page_num)
-    text = page.get_text("text")
-    
-    # Extract tables using Camelot
-    tables = camelot.read_pdf(pdf_path, pages=str(page_num+1))
-    
-    # Find the position of each table in the text
-    for i, table in enumerate(tables):
-        table_df = table.df  # Convert table to DataFrame
-        table_area = table._bbox  # Bounding box of the table
-        text_above_table = ""
-        
-        # Extract text above the table
-        for line in text.split('\n'):
-            bbox = page.search_for(line)
-            if bbox and bbox[0][3] < table_area[1]:  # Check if the line is above the table
-                text_above_table += line + "\n"
-        
-        # Extract the last line before the table as the table name
-        table_name = text_above_table.strip().split('\n')[-1]
-        
-        data.append((table_name, table_df))
+                    # Create a DataFrame from the table
+                    df = pd.DataFrame(table[1:], columns=table[0])
+                    all_data.append((table_name, df))
+                    
+                    # Remove used lines to avoid using the same name for the next table
+                    lines = lines[:-len(table)]
 
-# Convert to a dictionary of DataFrames
-tables_dict = {item[0]: item[1] for item in data}
+        return all_data
 
-# Example of accessing a table by its name
-for table_name, table_df in tables_dict.items():
-    print(f"Table Name: {table_name}")
-    print(table_df)
+# Path to your PDF file
+pdf_path = 'path_to_your_file.pdf'
+
+# Extract tables and their names
+tables_with_names = extract_tables_with_text(pdf_path)
+
+# Print the results
+for name, df in tables_with_names:
+    print(f"Table Name: {name}")
+    print(df)
     print("\n")
+
+# You can also save these tables to separate files if needed
+for name, df in tables_with_names:
+    df.to_csv(f"{name}.csv", index=False)
