@@ -1,63 +1,46 @@
 import fitz  # PyMuPDF
-import re
+import camelot
 import pandas as pd
-from datetime import datetime
 
 def extract_text_and_tables(pdf_path):
     # Open the PDF file
-    pdf_document = fitz.open(pdf_path)
-    extracted_data = []
-
-    # Iterate through each page
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
+    document = fitz.open(pdf_path)
+    
+    extracted_data = {}
+    text_blocks = []
+    current_text = ""
+    
+    for page_num in range(len(document)):
+        page = document.load_page(page_num)
         text = page.get_text("text")
-        blocks = page.get_text("blocks")
+        text_blocks.extend(text.split('\n'))
+
+        # Get tables from the current page
+        tables = camelot.read_pdf(pdf_path, pages=str(page_num + 1))
         
-        # Extract text blocks before tables
-        for block in blocks:
-            if block[6] == 0:  # Text block
-                description = block[4].strip()
-                
-                # Extract required fields from description
-                sub_status = "Subsidized" if "Subsidized" in description else ("Non-Subsidized" if "Non-Subsidized" in description else "Not Extracted")
-                program_type = "Low rate" if "Low rate Program" in description else "Not Extracted"
-                program_location_match = re.search(r'\b(23MY|24MY)\b', description)
-                program_location = program_location_match.group(0) if program_location_match else "Not Extracted"
-                date_match = re.search(r'(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', description)
-                start_date = date_match.group(1) if date_match else "Not Extracted"
-                end_date = date_match.group(2) if date_match else "Not Extracted"
-
-                # Search for the table following the text block
-                table_blocks = []
-                for tb in blocks:
-                    if tb[6] == 1:  # Table block
-                        table_blocks.append(tb)
-                        break
-
-                if table_blocks:
-                    # Extract table data using PyMuPDF or any other suitable method
-                    table = table_blocks[0][4].strip()
-                    # Convert table text to structured data (list of lists or DataFrame)
-                    # This example assumes the table is well-formed and can be split by rows and columns
-                    table_data = [row.split() for row in table.split('\n')]
-                    
-                    # Add the extracted data to the dictionary
-                    extracted_data.append({
-                        'Sub/Non Sub': sub_status,
-                        'Program Type': program_type,
-                        'Program Location': program_location,
-                        'Start Date': start_date,
-                        'End Date': end_date,
-                        'Table': table_data
-                    })
+        # Combine text blocks to form descriptions
+        for block in text_blocks:
+            if block.strip():  # Check if block is not empty
+                current_text += block.strip() + " "
+        
+        if tables:
+            for table in tables:
+                df = table.df
+                extracted_data[current_text.strip()] = df
+                current_text = ""  # Reset current text for next table
+    
+    # Handle any remaining text if it wasn't followed by a table
+    if current_text.strip():
+        extracted_data[current_text.strip()] = pd.DataFrame()
 
     return extracted_data
 
-# Example usage
-pdf_path = 'path/to/your/pdf_file.pdf'
+# Usage example
+pdf_path = 'path_to_your_pdf_file.pdf'
 data = extract_text_and_tables(pdf_path)
 
-# Optionally convert the data to a DataFrame for better visualization
-df = pd.DataFrame(data)
-print(df)
+# Display the extracted data
+for description, table in data.items():
+    print("Description:", description)
+    print("Table:")
+    print(table)
