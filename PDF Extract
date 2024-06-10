@@ -1,46 +1,69 @@
-import fitz  # PyMuPDF
-import camelot
+import PyPDF2
 import pandas as pd
+import tabula
 
-def extract_text_and_tables(pdf_path):
-    # Open the PDF file
-    document = fitz.open(pdf_path)
+def extract_text_from_pdf(pdf_path):
+    # Create a PDF reader object
+    reader = PyPDF2.PdfReader(pdf_path)
+    num_pages = len(reader.pages)
     
-    extracted_data = {}
-    text_blocks = []
-    current_text = ""
-    
-    for page_num in range(len(document)):
-        page = document.load_page(page_num)
-        text = page.get_text("text")
-        text_blocks.extend(text.split('\n'))
+    # Extract text from each page
+    text = []
+    for page_num in range(num_pages):
+        page = reader.pages[page_num]
+        text.append(page.extract_text())
+    return text
 
-        # Get tables from the current page
-        tables = camelot.read_pdf(pdf_path, pages=str(page_num + 1))
+def extract_tables_from_pdf(pdf_path):
+    # Extract all tables from the PDF using tabula
+    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+    return tables
+
+def match_texts_with_tables(texts, tables):
+    text_table_dict = {}
+    text_iter = iter(texts)
+    table_iter = iter(tables)
+    
+    current_text = next(text_iter)
+    current_table = next(table_iter)
+    
+    while True:
+        try:
+            next_text = next(text_iter)
+        except StopIteration:
+            next_text = None
         
-        # Combine text blocks to form descriptions
-        for block in text_blocks:
-            if block.strip():  # Check if block is not empty
-                current_text += block.strip() + " "
+        # Store the current text and table in the dictionary
+        text_table_dict[current_text] = current_table
         
-        if tables:
-            for table in tables:
-                df = table.df
-                extracted_data[current_text.strip()] = df
-                current_text = ""  # Reset current text for next table
+        if next_text is None:
+            break
+        
+        current_text = next_text
+        try:
+            current_table = next(table_iter)
+        except StopIteration:
+            break
     
-    # Handle any remaining text if it wasn't followed by a table
-    if current_text.strip():
-        extracted_data[current_text.strip()] = pd.DataFrame()
+    return text_table_dict
 
-    return extracted_data
+def main(pdf_path):
+    # Extract text and tables from the PDF
+    texts = extract_text_from_pdf(pdf_path)
+    tables = extract_tables_from_pdf(pdf_path)
+    
+    # Match texts with corresponding tables
+    text_table_dict = match_texts_with_tables(texts, tables)
+    
+    return text_table_dict
 
-# Usage example
-pdf_path = 'path_to_your_pdf_file.pdf'
-data = extract_text_and_tables(pdf_path)
+# Example usage
+pdf_path = 'path_to_your_pdf.pdf'
+text_table_dict = main(pdf_path)
 
-# Display the extracted data
-for description, table in data.items():
-    print("Description:", description)
-    print("Table:")
+# Output the dictionary
+for text, table in text_table_dict.items():
+    print("Text before table:", text)
+    print("Table data:")
     print(table)
+    print("\n")
