@@ -1,17 +1,55 @@
-import pandas as pd
-import tabula
+import re
 
-# Specify the path to the PDF file
-pdf_path = 'path/to/your/pdf_file.pdf'
-page_number = 1  # Specify the page number to extract tables from
+# Sample text
+text = """ACCOUNT NAME GOKUL ACCOUNT NUMBER 0012345678 ACCOUNT TYPE DEMAND DEPOSIT ACCOUNT
+STATEMENT DATE 01 MAR 2024 CURRENCY AUD INTEREST PERIOD 1 MAR 2024 TO 31 MAR 2024 
+STATEMENT NUMBER 00155 PAGE NUMBER 3 of 3 TAXID Interest Statement 30 MAR Interest 
+Accrued 14900000 0100000 163 30 MAR Interest Accrued 50000000 0100000 163"""
 
-# Extract all tables from the specified page
-tables = tabula.read_pdf(pdf_path, pages=page_number, multiple_tables=True)
+# Function to extract information using regex
+def extract_info(text):
+    info = {}
+    
+    # Extract Account Name
+    account_name_match = re.search(r'ACCOUNT NAME (\w+)', text)
+    if account_name_match:
+        info['Account Name'] = account_name_match.group(1)
+    
+    # Extract Account Number
+    account_number_match = re.search(r'ACCOUNT NUMBER (\d+)', text)
+    if account_number_match:
+        info['Account Number'] = account_number_match.group(1)
+    
+    # Extract Account Type
+    account_type_match = re.search(r'ACCOUNT TYPE ([A-Z ]+)', text)
+    if account_type_match:
+        info['Account Type'] = account_type_match.group(1).strip()
+    
+    # Extract Statement Date
+    statement_date_match = re.search(r'STATEMENT DATE (\d+ \w+ \d+)', text)
+    if statement_date_match:
+        info['Statement Date'] = statement_date_match.group(1)
+    
+    # Extract Currency
+    currency_match = re.search(r'CURRENCY (\w+)', text)
+    if currency_match:
+        info['Currency'] = currency_match.group(1)
+    
+    # Extract Interest Period
+    interest_period_match = re.search(r'INTEREST PERIOD (\d+ \w+ \d+ TO \d+ \w+ \d+)', text)
+    if interest_period_match:
+        info['Interest Period'] = interest_period_match.group(1)
+    
+    # Extract line with '30 MAR'
+    interest_line_match = re.search(r'.*30 MAR.*', text)
+    if interest_line_match:
+        info['Interest Line'] = interest_line_match.group(0)
+    
+    return info
 
-# Concatenate all extracted tables into a single DataFrame
-final_table = pd.concat(tables, ignore_index=True)
+# Extract the information
+extracted_info = extract_info(text)
 
-# Display the final table
-print(final_table)
-def remove_special_characters(text):
-    return re.sub(r'[^A-Za-z0-9\s]+', '', text)
+# Print the extracted information
+for key, value in extracted_info.items():
+    print(f"{key}: {value}")
