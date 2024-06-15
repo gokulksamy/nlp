@@ -1,55 +1,61 @@
 import re
+from datetime import datetime
 
-# Sample text
-text = """ACCOUNT NAME GOKUL ACCOUNT NUMBER 0012345678 ACCOUNT TYPE DEMAND DEPOSIT ACCOUNT
-STATEMENT DATE 01 MAR 2024 CURRENCY AUD INTEREST PERIOD 1 MAR 2024 TO 31 MAR 2024 
-STATEMENT NUMBER 00155 PAGE NUMBER 3 of 3 TAXID Interest Statement 30 MAR Interest 
-Accrued 14900000 0100000 163 30 MAR Interest Accrued 50000000 0100000 163"""
+text = """ACCOUNT NAME GOKUL ACCOUNT NUMBER 0012345678 ACCOUNT TYPE DEMAND DEPOSIT ACCOUNTSTATEMENT DATE 01 MAR 2024 CURRENCY AUD INTEREST PERIOD 1 MAR 2024 TO 31 MAR 2024 STATEMENT NUMBER 00155 PAGE NUMBER 3 of 3 TAXID Interest Statement 30 MAR Interest Accrued 14900000 0100000 163 31 MAR Interest Accrued 50000000 0100000 163"""
 
-# Function to extract information using regex
-def extract_info(text):
-    info = {}
-    
-    # Extract Account Name
-    account_name_match = re.search(r'ACCOUNT NAME (\w+)', text)
-    if account_name_match:
-        info['Account Name'] = account_name_match.group(1)
-    
-    # Extract Account Number
-    account_number_match = re.search(r'ACCOUNT NUMBER (\d+)', text)
-    if account_number_match:
-        info['Account Number'] = account_number_match.group(1)
-    
-    # Extract Account Type
-    account_type_match = re.search(r'ACCOUNT TYPE ([A-Z ]+)', text)
-    if account_type_match:
-        info['Account Type'] = account_type_match.group(1).strip()
-    
-    # Extract Statement Date
-    statement_date_match = re.search(r'STATEMENT DATE (\d+ \w+ \d+)', text)
-    if statement_date_match:
-        info['Statement Date'] = statement_date_match.group(1)
-    
-    # Extract Currency
-    currency_match = re.search(r'CURRENCY (\w+)', text)
-    if currency_match:
-        info['Currency'] = currency_match.group(1)
-    
-    # Extract Interest Period
-    interest_period_match = re.search(r'INTEREST PERIOD (\d+ \w+ \d+ TO \d+ \w+ \d+)', text)
-    if interest_period_match:
-        info['Interest Period'] = interest_period_match.group(1)
-    
-    # Extract line with '30 MAR'
-    interest_line_match = re.search(r'.*30 MAR.*', text)
-    if interest_line_match:
-        info['Interest Line'] = interest_line_match.group(0)
-    
-    return info
+# 1. Extract Account Name
+account_name_match = re.search(r'ACCOUNT NAME (\w+)', text)
+account_name = account_name_match.group(1) if account_name_match else None
 
-# Extract the information
-extracted_info = extract_info(text)
+# 2. Extract Account Number
+account_number_match = re.search(r'ACCOUNT NUMBER (\d+)', text)
+account_number = account_number_match.group(1) if account_number_match else None
 
-# Print the extracted information
-for key, value in extracted_info.items():
-    print(f"{key}: {value}")
+# 3. Extract Account Type
+account_type_match = re.search(r'ACCOUNT TYPE ([\w\s]+)', text)
+account_type = account_type_match.group(1) if account_type_match else None
+
+# 4. Extract Statement Date
+statement_date_match = re.search(r'ACCOUNTSTATEMENT DATE (\d{2} \w{3} \d{4})', text)
+statement_date = statement_date_match.group(1) if statement_date_match else None
+
+# 5. Extract Currency
+currency_match = re.search(r'CURRENCY (\w+)', text)
+currency = currency_match.group(1) if currency_match else None
+
+# 6. Extract Interest Period and split into start and end dates
+interest_period_match = re.search(r'INTEREST PERIOD (\d{1,2} \w{3} \d{4}) TO (\d{1,2} \w{3} \d{4})', text)
+interest_start_date = interest_period_match.group(1) if interest_period_match else None
+interest_end_date = interest_period_match.group(2) if interest_period_match else None
+interest_end_date_first_two_words = ' '.join(interest_end_date.split()[:2]) if interest_end_date else None
+
+# 7. Locate the line with keyword 6C and extract the entire line
+line_with_keyword_6c_match = re.search(rf'({interest_end_date_first_two_words} \w+ .+)', text)
+line_with_keyword_6c = line_with_keyword_6c_match.group(1) if line_with_keyword_6c_match else None
+
+# 7a. Extract 7 MAR
+line_date_match = re.search(r'^\d{2} \w{3}', line_with_keyword_6c)
+line_date = line_date_match.group(0) if line_date_match else None
+
+# 7b. Extract 1st word after "Interest Accrued" as Interest Based Balance
+interest_based_balance_match = re.search(r'Interest Accrued (\d+)', line_with_keyword_6c)
+interest_based_balance = interest_based_balance_match.group(1) if interest_based_balance_match else None
+
+# 7c. Extract 2nd word after "Interest Accrued" as Interest Rate and transform the format
+interest_rate_match = re.search(r'Interest Accrued \d+ (\d+)', line_with_keyword_6c)
+interest_rate = interest_rate_match.group(1) if interest_rate_match else None
+interest_rate_transformed = f"{int(interest_rate)/1000000:.6f}%" if interest_rate else None
+
+# Print results
+print(f"1. Account Name: {account_name}")
+print(f"2. Account Number: {account_number}")
+print(f"3. Account Type: {account_type}")
+print(f"4. Statement Date: {statement_date}")
+print(f"5. Currency: {currency}")
+print(f"6. Interest Period Start Date: {interest_start_date}")
+print(f"6b. Interest Period End Date: {interest_end_date}")
+print(f"6c. Interest Period End Date First Two Words: {interest_end_date_first_two_words}")
+print(f"7. Line with Keyword 6C: {line_with_keyword_6c}")
+print(f"7a. Line Date: {line_date}")
+print(f"7b. Interest Based Balance: {interest_based_balance}")
+print(f"7c. Interest Rate (Transformed): {interest_rate_transformed}")
