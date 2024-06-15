@@ -1,69 +1,22 @@
-import PyPDF2
+import pdfplumber
 import pandas as pd
-import tabula
 
-def extract_text_from_pdf(pdf_path):
-    # Create a PDF reader object
-    reader = PyPDF2.PdfReader(pdf_path)
-    num_pages = len(reader.pages)
-    
-    # Extract text from each page
-    text = []
-    for page_num in range(num_pages):
-        page = reader.pages[page_num]
-        text.append(page.extract_text())
-    return text
-
-def extract_tables_from_pdf(pdf_path):
-    # Extract all tables from the PDF using tabula
-    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
-    return tables
-
-def match_texts_with_tables(texts, tables):
-    text_table_dict = {}
-    text_iter = iter(texts)
-    table_iter = iter(tables)
-    
-    current_text = next(text_iter)
-    current_table = next(table_iter)
-    
-    while True:
-        try:
-            next_text = next(text_iter)
-        except StopIteration:
-            next_text = None
+def extract_tables_from_pdf(pdf_path, page_number):
+    # Open the PDF file
+    with pdfplumber.open(pdf_path) as pdf:
+        # Select the specific page
+        page = pdf.pages[page_number - 1]  # Page numbers are zero-based in pdfplumber
         
-        # Store the current text and table in the dictionary
-        text_table_dict[current_text] = current_table
-        
-        if next_text is None:
-            break
-        
-        current_text = next_text
-        try:
-            current_table = next(table_iter)
-        except StopIteration:
-            break
-    
-    return text_table_dict
+        # Extract tables from the selected page
+        tables = page.extract_tables()
 
-def main(pdf_path):
-    # Extract text and tables from the PDF
-    texts = extract_text_from_pdf(pdf_path)
-    tables = extract_tables_from_pdf(pdf_path)
-    
-    # Match texts with corresponding tables
-    text_table_dict = match_texts_with_tables(texts, tables)
-    
-    return text_table_dict
+        # Process and print each table
+        for i, table in enumerate(tables):
+            df = pd.DataFrame(table[1:], columns=table[0])  # Create a DataFrame and use the first row as column headers
+            print(f"Table {i + 1} on page {page_number}:\n", df, "\n")
 
 # Example usage
-pdf_path = 'path_to_your_pdf.pdf'
-text_table_dict = main(pdf_path)
+pdf_path = 'path/to/your/pdf_file.pdf'
+page_number = 2  # Specify the page number from which you want to extract tables
 
-# Output the dictionary
-for text, table in text_table_dict.items():
-    print("Text before table:", text)
-    print("Table data:")
-    print(table)
-    print("\n")
+extract_tables_from_pdf(pdf_path, page_number)
