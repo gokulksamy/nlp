@@ -1,22 +1,15 @@
-import pdfplumber
 import pandas as pd
+import tabula
 
-def extract_tables_from_pdf(pdf_path, page_number):
-    # Open the PDF file
-    with pdfplumber.open(pdf_path) as pdf:
-        # Select the specific page
-        page = pdf.pages[page_number - 1]  # Page numbers are zero-based in pdfplumber
-        
-        # Extract tables from the selected page
-        tables = page.extract_tables()
-
-        # Process and print each table
-        for i, table in enumerate(tables):
-            df = pd.DataFrame(table[1:], columns=table[0])  # Create a DataFrame and use the first row as column headers
-            print(f"Table {i + 1} on page {page_number}:\n", df, "\n")
-
-# Example usage
+# Specify the path to the PDF file
 pdf_path = 'path/to/your/pdf_file.pdf'
-page_number = 2  # Specify the page number from which you want to extract tables
+page_number = 1  # Specify the page number to extract tables from
 
-extract_tables_from_pdf(pdf_path, page_number)
+# Extract all tables from the specified page
+tables = tabula.read_pdf(pdf_path, pages=page_number, multiple_tables=True)
+
+# Concatenate all extracted tables into a single DataFrame
+final_table = pd.concat(tables, ignore_index=True)
+
+# Display the final table
+print(final_table)
