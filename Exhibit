@@ -1,82 +1,55 @@
-import re
-import PyPDF2
+import fitz  # PyMuPDF
 import tabula
 import pandas as pd
-from datetime import datetime
 
-# Function to extract the metadata from text
-def extract_metadata(text):
-    data = {}
-    
-    # Extract Subsidized/Non-Subsidized status
-    if 'Subsidized' in text:
-        data['Sub/Non Sub'] = 'Subsidized'
-    elif 'Non-Subsidized' in text:
-        data['Sub/Non Sub'] = 'Non Subsidized'
-    else:
-        data['Sub/Non Sub'] = 'Not Extracted'
-    
-    # Extract Program Type
-    if 'Low rate Program' in text:
-        data['Program Type'] = 'Low rate'
-    else:
-        data['Program Type'] = 'Not Extracted'
-    
-    # Extract Program Location
-    program_location_match = re.search(r'(\d{2}MY.*?)(?=Effective:)', text)
-    if program_location_match:
-        data['Program Location'] = program_location_match.group(1).strip()
-    else:
-        data['Program Location'] = 'Not Extracted'
-    
-    # Extract Dates
-    date_match = re.search(r'Effective: (\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', text)
-    if date_match:
-        data['Start Date'] = date_match.group(1).strip()
-        data['End Date'] = date_match.group(2).strip()
-    else:
-        data['Start Date'] = 'Not Extracted'
-        data['End Date'] = 'Not Extracted'
-    
+def extract_text_and_tables(pdf_path):
+    doc = fitz.open(pdf_path)
+    data = []
+
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text = page.get_text("text")
+        
+        # Extract tables using tabula
+        tables = tabula.read_pdf(pdf_path, pages=page_num + 1, multiple_tables=True)
+
+        # Extract text before each table
+        blocks = page.get_text("blocks")
+        paragraphs_before_tables = []
+        current_paragraph = ""
+        table_coords = [table.bbox for table in tables] if tables else []
+
+        for block in blocks:
+            block_bbox = block[:4]
+            block_text = block[4]
+            if any(fitz.Rect(block_bbox).intersects(fitz.Rect(table_bbox)) for table_bbox in table_coords):
+                paragraphs_before_tables.append(current_paragraph.strip())
+                current_paragraph = ""
+            else:
+                current_paragraph += block_text + "\n"
+        
+        # Add the last paragraph if there are tables but no ending paragraph detected
+        if tables:
+            paragraphs_before_tables.append(current_paragraph.strip())
+
+        page_data = {
+            "Page Num": page_num + 1,
+            "Text in the Page": text,
+            "Tables in page": tables,
+            "Text before each Table": paragraphs_before_tables
+        }
+        
+        data.append(page_data)
+
     return data
 
-# Function to extract text and tables from PDF
-def extract_from_pdf(pdf_path):
-    # Extract text from PDF
-    with open(pdf_path, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
-        full_text = ""
-        for page in reader.pages:
-            full_text += page.extract_text() + "\n"
+# Example usage:
+pdf_path = 'example.pdf'  # Replace with the path to your PDF file
+extracted_data = extract_text_and_tables(pdf_path)
 
-    # Extract tables from PDF
-    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+# Convert to DataFrame for better visualization
+df = pd.DataFrame(extracted_data)
+print(df)
 
-    # Process text to extract metadata
-    table_start_indices = [m.start() for m in re.finditer(r'Table', full_text)]
-    paragraphs = []
-    last_index = 0
-    for index in table_start_indices:
-        paragraphs.append(full_text[last_index:index].strip())
-        last_index = index
-    
-    # Assuming tables are in order, extract metadata for each table
-    metadata = [extract_metadata(paragraph) for paragraph in paragraphs]
-
-    return tables, metadata
-
-# Path to the PDF file
-pdf_path = 'path_to_your_pdf_file.pdf'
-
-# Extract tables and metadata
-tables, metadata = extract_from_pdf(pdf_path)
-
-# Save tables and metadata to Excel file
-with pd.ExcelWriter('output.xlsx') as writer:
-    for i, (table, meta) in enumerate(zip(tables, metadata)):
-        # Convert metadata to DataFrame and concatenate with table
-        meta_df = pd.DataFrame([meta])
-        combined_df = pd.concat([meta_df, table], axis=1)
-        
-        # Write to separate sheet
-        combined_df.to_excel(writer, sheet_name=f'Table_{i+1}', index=False)
+# If needed, save the DataFrame to a CSV file
+df.to_csv('extracted_data.csv', index=False)
