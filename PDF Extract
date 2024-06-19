@@ -1,49 +1,72 @@
 import re
+import pdfplumber
+import pandas as pd
 
-# Given text
-text = """ACCOUNT NAME GOKUL ACCOUNT NUMBER 0012345678 ACCOUNT TYPE DEMAND DEPOSIT ACCOUNTSTATEMENT DATE 01 MAR 2024 CURRENCY AUD INTEREST PERIOD 1 MAR 2024 TO 31 MAR 2024 STATEMENT NUMBER 00155 PAGE NUMBER 3 of 3 TAXID Interest Statement 30 MAR Interest Accrued 14900000 0100000 163 31 MAR Interest Accrued 50000000 0100000 163"""
+# Function to extract information based on the description
+def extract_info(description):
+    # Extract Sub/Non Sub
+    if "Subsidized" in description:
+        sub_non_sub = "Subsidized"
+    elif "Non-Subsidized" in description:
+        sub_non_sub = "Non Subsidized"
+    else:
+        sub_non_sub = "Not Extracted"
 
-# Define a function to extract required details
-def extract_details(text):
-    details = {}
+    # Extract Program Type
+    if "Low rate Program" in description:
+        program_type = "Low rate"
+    else:
+        program_type = "Not Extracted"
 
-    # Extract Account Name
-    details['Account Name'] = re.search(r'ACCOUNT NAME (\w+)', text).group(1)
+    # Extract Program Location
+    match = re.search(r'(\d{2}MY.*?)(?=[ .,]|$)', description)
+    program_location = match.group(0) if match else "Not Extracted"
 
-    # Extract Account Number
-    details['Account Number'] = re.search(r'ACCOUNT NUMBER (\d+)', text).group(1)
+    # Extract Dates
+    date_match = re.search(r'(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', description)
+    if date_match:
+        start_date = date_match.group(1)
+        end_date = date_match.group(2)
+    else:
+        start_date = end_date = "Not Extracted"
 
-    # Extract Account Type
-    details['Account Type'] = re.search(r'ACCOUNT TYPE ([A-Z ]+)', text).group(1).strip()
+    return sub_non_sub, program_type, program_location, start_date, end_date
 
-    # Extract Statement Date
-    details['Statement Date'] = re.search(r'DATE (\d+ \w+ \d+)', text).group(1)
+# Path to the PDF file
+pdf_path = '/mnt/data/your_pdf_file.pdf'
 
-    # Extract Currency
-    details['Currency'] = re.search(r'CURRENCY (\w+)', text).group(1)
+# Initialize an empty DataFrame to store all tables
+all_tables = pd.DataFrame()
 
-    # Extract Interest Period
-    interest_period = re.search(r'INTEREST PERIOD (\d+ \w+ \d+) TO (\d+ \w+ \d+)', text)
-    details['Interest Period Start Date'] = interest_period.group(1)
-    details['Interest Period End Date'] = interest_period.group(2)
-    details['Interest Period End Date Short'] = ' '.join(details['Interest Period End Date'].split()[:2])
+with pdfplumber.open(pdf_path) as pdf:
+    for page in pdf.pages:
+        # Extract the text from the page
+        text = page.extract_text()
+        
+        # Find the tables on the page
+        tables = page.extract_tables()
 
-    # Locate the line with keyword 6C (end date short)
-    end_date_short = details['Interest Period End Date Short']
-    required_line_match = re.search(rf'{end_date_short} Interest Accrued .+', text)
-    required_line = required_line_match.group(0)
-    details['Required Line'] = required_line
+        # Process each table
+        for table in tables:
+            # Convert the table to a DataFrame
+            df = pd.DataFrame(table[1:], columns=table[0])
+            
+            # Extract the description before the table
+            # Assuming the description is the last paragraph of text before the table
+            description = text.split('\n')[-len(table) - 1]
+            
+            # Extract the additional columns based on the description
+            sub_non_sub, program_type, program_location, start_date, end_date = extract_info(description)
+            
+            # Add the additional columns to the DataFrame
+            df['Sub/Non Sub'] = sub_non_sub
+            df['Program Type'] = program_type
+            df['Program Location'] = program_location
+            df['Start Date'] = start_date
+            df['End Date'] = end_date
+            
+            # Append the DataFrame to the list of all tables
+            all_tables = pd.concat([all_tables, df], ignore_index=True)
 
-    # Extract specific details from the required line
-    line_parts = required_line.split()
-    details['Last Date'] = ' '.join(line_parts[:2])
-    details['Interest Based Balance'] = line_parts[4]
-    details['Interest Rate'] = f"{float(line_parts[5])/1000000:.6%}"
-
-    return details
-
-# Extract details
-extracted_details = extract_details(text)
-
-# Print the extracted details
-print(extracted_details)
+# Save the final table to a CSV file
+all_tables.to_csv('/mnt/data/extracted_tables.csv', index=False)
