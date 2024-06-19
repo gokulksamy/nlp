@@ -1,4 +1,4 @@
-match_date = re.search(r"(\w+\s\d{1,2},\s\d{4})\s*-\s*(\w+\s\d{1,2},\s\d{4})", text)
+match_date = re.search(r"(\w+\s\d{1,2}\s*,\s*\d{4})\s*-\s*(\w+\s\d{1,2}\s*,\s*\d{4})", text)
     if match_date:
-        additional_info["Start Date"] = match_date.group(1).strip()
-        additional_info["End Date"] = match_date.group(2).strip()
+        additional_info["First Date"] = match_date.group(1).strip()
+        additional_info["Last Date"] = match_date.group(2).strip()
