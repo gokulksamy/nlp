@@ -1,79 +1,82 @@
 import re
-import pdfplumber
+import PyPDF2
 import tabula
 import pandas as pd
+from datetime import datetime
 
-# Function to extract information based on the description
-def extract_info(description):
-    # Extract Sub/Non Sub
-    if "Subsidized" in description:
-        sub_non_sub = "Subsidized"
-    elif "Non-Subsidized" in description:
-        sub_non_sub = "Non Subsidized"
+# Function to extract the metadata from text
+def extract_metadata(text):
+    data = {}
+    
+    # Extract Subsidized/Non-Subsidized status
+    if 'Subsidized' in text:
+        data['Sub/Non Sub'] = 'Subsidized'
+    elif 'Non-Subsidized' in text:
+        data['Sub/Non Sub'] = 'Non Subsidized'
     else:
-        sub_non_sub = "Not Extracted"
-
+        data['Sub/Non Sub'] = 'Not Extracted'
+    
     # Extract Program Type
-    if "Low rate Program" in description:
-        program_type = "Low rate"
+    if 'Low rate Program' in text:
+        data['Program Type'] = 'Low rate'
     else:
-        program_type = "Not Extracted"
-
+        data['Program Type'] = 'Not Extracted'
+    
     # Extract Program Location
-    match = re.search(r'(\d{2}MY.*?)(?=[ .,]|$)', description)
-    program_location = match.group(0) if match else "Not Extracted"
-
-    # Extract Dates
-    date_match = re.search(r'(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', description)
-    if date_match:
-        start_date = date_match.group(1)
-        end_date = date_match.group(2)
+    program_location_match = re.search(r'(\d{2}MY.*?)(?=Effective:)', text)
+    if program_location_match:
+        data['Program Location'] = program_location_match.group(1).strip()
     else:
-        start_date = end_date = "Not Extracted"
+        data['Program Location'] = 'Not Extracted'
+    
+    # Extract Dates
+    date_match = re.search(r'Effective: (\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', text)
+    if date_match:
+        data['Start Date'] = date_match.group(1).strip()
+        data['End Date'] = date_match.group(2).strip()
+    else:
+        data['Start Date'] = 'Not Extracted'
+        data['End Date'] = 'Not Extracted'
+    
+    return data
 
-    return sub_non_sub, program_type, program_location, start_date, end_date
+# Function to extract text and tables from PDF
+def extract_from_pdf(pdf_path):
+    # Extract text from PDF
+    with open(pdf_path, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        full_text = ""
+        for page in reader.pages:
+            full_text += page.extract_text() + "\n"
+
+    # Extract tables from PDF
+    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+
+    # Process text to extract metadata
+    table_start_indices = [m.start() for m in re.finditer(r'Table', full_text)]
+    paragraphs = []
+    last_index = 0
+    for index in table_start_indices:
+        paragraphs.append(full_text[last_index:index].strip())
+        last_index = index
+    
+    # Assuming tables are in order, extract metadata for each table
+    metadata = [extract_metadata(paragraph) for paragraph in paragraphs]
+
+    return tables, metadata
 
 # Path to the PDF file
-pdf_path = '/mnt/data/your_pdf_file.pdf'
+pdf_path = 'path_to_your_pdf_file.pdf'
 
-# Extract all tables from the PDF using tabula
-tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+# Extract tables and metadata
+tables, metadata = extract_from_pdf(pdf_path)
 
-# Initialize an empty DataFrame to store all tables
-all_tables = pd.DataFrame()
-
-with pdfplumber.open(pdf_path) as pdf:
-    for page_num, page in enumerate(pdf.pages, start=1):
-        # Extract the text from the page
-        text = page.extract_text()
-        paragraphs = text.split('\n')
+# Save tables and metadata to Excel file
+with pd.ExcelWriter('output.xlsx') as writer:
+    for i, (table, meta) in enumerate(zip(tables, metadata)):
+        # Convert metadata to DataFrame and concatenate with table
+        meta_df = pd.DataFrame([meta])
+        combined_df = pd.concat([meta_df, table], axis=1)
         
-        # Process each table on the page
-        page_tables = tables[page_num - 1]
-        
-        for table in page_tables:
-            # Convert the table to a DataFrame
-            df = pd.DataFrame(table[1:], columns=table[0])
-            
-            # Extract all paragraphs above the table
-            # Find the index of the table in the text
-            table_start_index = text.find(table[0][0])
-            
-            # Find the text before the table
-            description = text[:table_start_index].strip()
-            
-            # Extract the additional columns based on the description
-            sub_non_sub, program_type, program_location, start_date, end_date = extract_info(description)
-            
-            # Add the additional columns to the DataFrame
-            df['Sub/Non Sub'] = sub_non_sub
-            df['Program Type'] = program_type
-            df['Program Location'] = program_location
-            df['Start Date'] = start_date
-            df['End Date'] = end_date
-            
-            # Append the DataFrame to the list of all tables
-            all_tables = pd.concat([all_tables, df], ignore_index=True)
-
-# Save the final table to a CSV file
-all_tables.to_csv('/mnt/data/extracted_tables.csv', index=False)
+        # Write to separate sheet
+        combined_df.to_excel(writer, sheet_name=f'Table_{i+1}', index=False)
