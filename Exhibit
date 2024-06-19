@@ -1,5 +1,6 @@
 import re
 import pdfplumber
+import tabula
 import pandas as pd
 
 # Function to extract information based on the description
@@ -35,29 +36,31 @@ def extract_info(description):
 # Path to the PDF file
 pdf_path = '/mnt/data/your_pdf_file.pdf'
 
+# Extract all tables from the PDF using tabula
+tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+
 # Initialize an empty DataFrame to store all tables
 all_tables = pd.DataFrame()
 
 with pdfplumber.open(pdf_path) as pdf:
-    for page in pdf.pages:
+    for page_num, page in enumerate(pdf.pages, start=1):
         # Extract the text from the page
         text = page.extract_text()
         paragraphs = text.split('\n')
         
-        # Find the tables on the page
-        tables = page.extract_tables()
-
-        # Process each table
-        for table in tables:
+        # Process each table on the page
+        page_tables = tables[page_num - 1]
+        
+        for table in page_tables:
             # Convert the table to a DataFrame
             df = pd.DataFrame(table[1:], columns=table[0])
             
             # Extract all paragraphs above the table
             # Find the index of the table in the text
-            table_index = text.find(table[0][0])
+            table_start_index = text.find(table[0][0])
             
             # Find the text before the table
-            description = text[:table_index]
+            description = text[:table_start_index].strip()
             
             # Extract the additional columns based on the description
             sub_non_sub, program_type, program_location, start_date, end_date = extract_info(description)
