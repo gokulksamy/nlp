@@ -1,6 +1,35 @@
 import fitz  # PyMuPDF
 import tabula
 import pandas as pd
+import re
+
+def extract_additional_info(text):
+    additional_info = {
+        "Sub/Non Sub": "Not Extracted",
+        "Program Type": "Not Extracted",
+        "Program Location": "Not Extracted",
+        "Start Date": "Not Extracted",
+        "End Date": "Not Extracted"
+    }
+
+    if "Subsidized" in text:
+        additional_info["Sub/Non Sub"] = "Subsidized"
+    elif "Non-Subsidized" in text:
+        additional_info["Sub/Non Sub"] = "Non Subsidized"
+
+    if "Low rate Program" in text:
+        additional_info["Program Type"] = "Low rate"
+
+    match_location = re.search(r"(23MY|24MY)(.*?)(?=\s-\s|\.)", text)
+    if match_location:
+        additional_info["Program Location"] = match_location.group(2).strip()
+
+    match_date = re.search(r"(\w+\s\d+\,\s\d{4})\s-\s(\w+\s\d+\,\s\d{4})", text)
+    if match_date:
+        additional_info["Start Date"] = match_date.group(1).strip()
+        additional_info["End Date"] = match_date.group(2).strip()
+
+    return additional_info
 
 def extract_text_and_tables(pdf_path):
     doc = fitz.open(pdf_path)
@@ -13,43 +42,41 @@ def extract_text_and_tables(pdf_path):
         # Extract tables using tabula
         tables = tabula.read_pdf(pdf_path, pages=page_num + 1, multiple_tables=True)
 
-        # Extract text before each table
-        blocks = page.get_text("blocks")
-        paragraphs_before_tables = []
-        current_paragraph = ""
-        table_coords = [table.bbox for table in tables] if tables else []
+        additional_info = extract_additional_info(text)
 
-        for block in blocks:
-            block_bbox = block[:4]
-            block_text = block[4]
-            if any(fitz.Rect(block_bbox).intersects(fitz.Rect(table_bbox)) for table_bbox in table_coords):
-                paragraphs_before_tables.append(current_paragraph.strip())
-                current_paragraph = ""
-            else:
-                current_paragraph += block_text + "\n"
-        
-        # Add the last paragraph if there are tables but no ending paragraph detected
-        if tables:
-            paragraphs_before_tables.append(current_paragraph.strip())
+        for i, table in enumerate(tables):
+            table_df = pd.DataFrame(table)
+            table_df["Sub/Non Sub"] = additional_info["Sub/Non Sub"]
+            table_df["Program Type"] = additional_info["Program Type"]
+            table_df["Program Location"] = additional_info["Program Location"]
+            table_df["Start Date"] = additional_info["Start Date"]
+            table_df["End Date"] = additional_info["End Date"]
+            tables[i] = table_df
 
         page_data = {
             "Page Num": page_num + 1,
             "Text in the Page": text,
-            "Tables in page": tables,
-            "Text before each Table": paragraphs_before_tables
+            "Tables in page": tables
         }
         
         data.append(page_data)
 
     return data
 
+def save_tables_to_excel(extracted_data, output_path):
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        for page_data in extracted_data:
+            page_num = page_data["Page Num"]
+            tables = page_data["Tables in page"]
+
+            for i, table_df in enumerate(tables):
+                sheet_name = f"Page{page_num}_Table{i+1}"
+                table_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
 # Example usage:
 pdf_path = 'example.pdf'  # Replace with the path to your PDF file
 extracted_data = extract_text_and_tables(pdf_path)
 
-# Convert to DataFrame for better visualization
-df = pd.DataFrame(extracted_data)
-print(df)
-
-# If needed, save the DataFrame to a CSV file
-df.to_csv('extracted_data.csv', index=False)
+# Save tables to an Excel file
+output_excel_path = 'extracted_tables.xlsx'  # Specify your desired output path
+save_tables_to_excel(extracted_data, output_excel_path)
