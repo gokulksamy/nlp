@@ -1,28 +1,79 @@
 import pdfplumber
 import pandas as pd
+import re
+from datetime import datetime
+
+def extract_date(text):
+    date_pattern = r"(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})"
+    match = re.search(date_pattern, text)
+    if match:
+        start_date = datetime.strptime(match.group(1), '%B %d, %Y')
+        end_date = datetime.strptime(match.group(2), '%B %d, %Y')
+        return start_date, end_date
+    return None, None
+
+def extract_information(text):
+    info = {}
+    if 'Subsidized' in text:
+        info['Sub/Non Sub'] = 'Subsidized'
+    elif 'Non-Subsidized' in text:
+        info['Sub/Non Sub'] = 'Non Subsidized'
+    else:
+        info['Sub/Non Sub'] = 'Not Extracted'
+
+    if 'Low rate Program' in text:
+        info['Program Type'] = 'Low rate'
+    else:
+        info['Program Type'] = 'Not Extracted'
+
+    if '23my' in text or '24my' in text:
+        info['Program Location'] = 'Found'
+    else:
+        info['Program Location'] = 'Not Extracted'
+        
+    start_date, end_date = extract_date(text)
+    info['Start Date'] = start_date
+    info['End Date'] = end_date
+
+    return info
 
 # Path to the PDF file
-pdf_path = "your_file.pdf"
+pdf_path = "/mnt/data/image.png"
 
-# Open the PDF file
+# Initialize an empty dictionary to store the extracted data
+extracted_data = {}
+
 with pdfplumber.open(pdf_path) as pdf:
-    all_tables = []
-    for page in pdf.pages:
-        # Extract tables from each page
+    for i, page in enumerate(pdf.pages):
+        page_num = i + 1
+        text = page.extract_text()
         tables = page.extract_tables()
-        for table in tables:
-            # Convert the table into a DataFrame
-            df = pd.DataFrame(table[1:], columns=table[0])
-            all_tables.append(df)
+        
+        print(f"Page Num: {page_num}")
+        print("Text in the Page:")
+        print(text)
+        print("Tables in the Page:")
+        print(tables)
 
-# Combine all tables into a single DataFrame if needed
-combined_df = pd.concat(all_tables, ignore_index=True)
+        if text:
+            info = extract_information(text)
+        else:
+            info = {
+                'Sub/Non Sub': 'Not Extracted',
+                'Program Type': 'Not Extracted',
+                'Program Location': 'Not Extracted',
+                'Start Date': None,
+                'End Date': None
+            }
 
-# Display the extracted tables
-for i, table in enumerate(all_tables):
-    print(f"Table {i + 1}:")
-    print(table)
-    print()
+        if tables:
+            for table in tables:
+                df = pd.DataFrame(table[1:], columns=table[0])
+                for key, value in info.items():
+                    df[key] = value
+                extracted_data[f"Page {page_num} Table {tables.index(table) + 1}"] = df
 
-# Optionally, save the combined DataFrame to a CSV file
-combined_df.to_csv("extracted_tables.csv", index=False)
+# Display the extracted data
+for key, value in extracted_data.items():
+    print(f"{key}:")
+    print(value)
