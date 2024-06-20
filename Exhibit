@@ -1,6 +1,28 @@
-# Combine existing column names with the values from the first row
-new_columns = [f"{col} {df.iloc[0, idx]}" for idx, col in enumerate(df.columns)]
-df.columns = new_columns
+import pdfplumber
+import pandas as pd
 
-# Remove the first row and reset the DataFrame index
-df = df[1:].reset_index(drop=True)
+# Path to the PDF file
+pdf_path = "your_file.pdf"
+
+# Open the PDF file
+with pdfplumber.open(pdf_path) as pdf:
+    all_tables = []
+    for page in pdf.pages:
+        # Extract tables from each page
+        tables = page.extract_tables()
+        for table in tables:
+            # Convert the table into a DataFrame
+            df = pd.DataFrame(table[1:], columns=table[0])
+            all_tables.append(df)
+
+# Combine all tables into a single DataFrame if needed
+combined_df = pd.concat(all_tables, ignore_index=True)
+
+# Display the extracted tables
+for i, table in enumerate(all_tables):
+    print(f"Table {i + 1}:")
+    print(table)
+    print()
+
+# Optionally, save the combined DataFrame to a CSV file
+combined_df.to_csv("extracted_tables.csv", index=False)
