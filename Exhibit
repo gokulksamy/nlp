@@ -1,4 +1,6 @@
-match_date = re.search(r"(\w+\s\d{1,2}\s*,\s*\d{4})\s*-\s*(\w+\s\d{1,2}\s*,\s*\d{4})", text)
-    if match_date:
-        additional_info["First Date"] = match_date.group(1).strip()
-        additional_info["Last Date"] = match_date.group(2).strip()
+# Combine existing column names with the values from the first row
+new_columns = [f"{col} {df.iloc[0, idx]}" for idx, col in enumerate(df.columns)]
+df.columns = new_columns
+
+# Remove the first row and reset the DataFrame index
+df = df[1:].reset_index(drop=True)
