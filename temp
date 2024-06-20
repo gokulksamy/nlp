@@ -1,0 +1,71 @@
+import pdfplumber
+import pandas as pd
+import re
+from datetime import datetime
+
+# Open the PDF file
+pdf_path = "path_to_your_pdf.pdf"
+
+def extract_date(text):
+    date_pattern = re.compile(r'([A-Za-z]+\s\d{1,2},\s\d{4})\s*-\s*([A-Za-z]+\s\d{1,2},\s\d{4})')
+    match = date_pattern.search(text)
+    if match:
+        start_date, end_date = match.groups()
+        return start_date, end_date
+    return None, None
+
+def extract_program_location(text):
+    location_pattern = re.compile(r'.*(23my|24my).*', re.IGNORECASE)
+    match = location_pattern.search(text)
+    if match:
+        return match.group(0)
+    return "not extracted"
+
+def extract_program_type(text):
+    if "Low rate Program" in text:
+        return "Low rate"
+    return "not extracted"
+
+def extract_sub_non_sub(text):
+    if "Subsidized" in text:
+        return "Subsidized"
+    elif "Non-Subsidized" in text:
+        return "Non Subsidized"
+    return "Not Extracted"
+
+# Variable to store first table and first page
+df1 = None
+text_first_page = None
+
+with pdfplumber.open(pdf_path) as pdf:
+    for i, page in enumerate(pdf.pages):
+        if i == 0:  # First page
+            text_first_page = page.extract_text()
+        
+        tables = page.extract_tables()
+        
+        if i == 0 and tables:  # First table on first page
+            table = tables[0]
+            df = pd.DataFrame(table)
+            df.dropna(how='all', axis=0, inplace=True)
+            df.dropna(how='all', axis=1, inplace=True)
+            df.ffill(axis=0, inplace=True)
+            
+            sub_non_sub = extract_sub_non_sub(text_first_page)
+            program_type = extract_program_type(text_first_page)
+            program_location = extract_program_location(text_first_page)
+            start_date, end_date = extract_date(text_first_page)
+            
+            df['Sub/Non Sub'] = sub_non_sub
+            df['Program Type'] = program_type
+            df['Program Location'] = program_location
+            df['Start Date'] = start_date
+            df['End Date'] = end_date
+            
+            df1 = df
+            break  # Exit loop after first page and first table
+
+# Now `df1` contains the first table from the first page of the PDF
+# You can further process `df1` as needed
+print("First Table from First Page:")
+print(df1)
