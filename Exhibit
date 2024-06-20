@@ -1,79 +1,72 @@
 import pdfplumber
 import pandas as pd
 import re
-from datetime import datetime
 
-def extract_date(text):
-    date_pattern = r"(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})"
-    match = re.search(date_pattern, text)
-    if match:
-        start_date = datetime.strptime(match.group(1), '%B %d, %Y')
-        end_date = datetime.strptime(match.group(2), '%B %d, %Y')
-        return start_date, end_date
-    return None, None
+def extract_additional_columns(text):
+    sub_non_sub = "Not Extracted"
+    program_type = "Not Extracted"
+    program_location = "Not Extracted"
+    start_date = "Not Extracted"
+    end_date = "Not Extracted"
+    
+    if "Subsidized" in text:
+        sub_non_sub = "Subsidized"
+    elif "Non-Subsidized" in text:
+        sub_non_sub = "Non Subsidized"
+    
+    if "Low rate Program" in text:
+        program_type = "Low rate"
+    
+    location_match = re.search(r'23my|24 my', text)
+    if location_match:
+        program_location = location_match.group(0)
+    
+    date_match = re.search(r'(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', text)
+    if date_match:
+        start_date, end_date = date_match.groups()
+    
+    return sub_non_sub, program_type, program_location, start_date, end_date
 
-def extract_information(text):
-    info = {}
-    if 'Subsidized' in text:
-        info['Sub/Non Sub'] = 'Subsidized'
-    elif 'Non-Subsidized' in text:
-        info['Sub/Non Sub'] = 'Non Subsidized'
-    else:
-        info['Sub/Non Sub'] = 'Not Extracted'
+def process_pdf(file_path):
+    with pdfplumber.open(file_path) as pdf:
+        results = []
 
-    if 'Low rate Program' in text:
-        info['Program Type'] = 'Low rate'
-    else:
-        info['Program Type'] = 'Not Extracted'
+        for page_number, page in enumerate(pdf.pages, start=1):
+            page_text = page.extract_text()
+            tables = page.extract_tables()
 
-    if '23my' in text or '24my' in text:
-        info['Program Location'] = 'Found'
-    else:
-        info['Program Location'] = 'Not Extracted'
-        
-    start_date, end_date = extract_date(text)
-    info['Start Date'] = start_date
-    info['End Date'] = end_date
-
-    return info
-
-# Path to the PDF file
-pdf_path = "/mnt/data/image.png"
-
-# Initialize an empty dictionary to store the extracted data
-extracted_data = {}
-
-with pdfplumber.open(pdf_path) as pdf:
-    for i, page in enumerate(pdf.pages):
-        page_num = i + 1
-        text = page.extract_text()
-        tables = page.extract_tables()
-        
-        print(f"Page Num: {page_num}")
-        print("Text in the Page:")
-        print(text)
-        print("Tables in the Page:")
-        print(tables)
-
-        if text:
-            info = extract_information(text)
-        else:
-            info = {
-                'Sub/Non Sub': 'Not Extracted',
-                'Program Type': 'Not Extracted',
-                'Program Location': 'Not Extracted',
-                'Start Date': None,
-                'End Date': None
-            }
-
-        if tables:
+            processed_tables = []
             for table in tables:
-                df = pd.DataFrame(table[1:], columns=table[0])
-                for key, value in info.items():
-                    df[key] = value
-                extracted_data[f"Page {page_num} Table {tables.index(table) + 1}"] = df
+                df = pd.DataFrame(table)
+                df.dropna(how='all', axis=0, inplace=True)
+                df.dropna(how='all', axis=1, inplace=True)
+                df.ffill(axis=0, inplace=True)
+                
+                sub_non_sub, program_type, program_location, start_date, end_date = extract_additional_columns(page_text)
+                df['Sub/Non Sub'] = sub_non_sub
+                df['Program Type'] = program_type
+                df['Program Location'] = program_location
+                df['Start Date'] = start_date
+                df['End Date'] = end_date
+                
+                processed_tables.append(df)
+            
+            results.append({
+                'Page Num': page_number,
+                'Text in the Page': page_text,
+                'Tables in page modified': processed_tables
+            })
 
-# Display the extracted data
-for key, value in extracted_data.items():
-    print(f"{key}:")
-    print(value)
+    return results
+
+# Replace with the actual path to your PDF file
+pdf_file_path = '/mnt/data/your_pdf_file.pdf'
+data = process_pdf(pdf_file_path)
+
+# Printing the results for verification
+for page_data in data:
+    print(f"Page Number: {page_data['Page Num']}")
+    print(f"Text in the Page:\n{page_data['Text in the Page']}")
+    for idx, table in enumerate(page_data['Tables in page modified']):
+        print(f"Table {idx+1} in Page {page_data['Page Num']}:")
+        print(table)
