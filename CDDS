@@ -1,0 +1,50 @@
+import pdfplumber
+import pandas as pd
+import re
+import os
+
+# Define the folder containing the PDF files
+folder_path = '/path/to/your/pdf/folder'
+
+# Function to extract information from the text content of the PDF
+def extract_info(text):
+    data = {}
+    # Extract CD ending
+    data['CD Ending with'] = re.search(r'CD ending in (\d+)', text).group(1)
+    # Extract Term
+    data['Term'] = re.search(r'Term: (\d+ Months?)', text).group(1)
+    # Extract Maturity
+    data['Maturity'] = re.search(r'Projected Value at Maturity : \$(\d+,\d+.\d+)', text).group(1)
+    # Extract Annual Percentage Yield (APY)
+    data['Annual Percentage Yield (APY)'] = re.search(r'Annual Percentage Yield\s+\(APY\) : (\d+\.\d+%)', text).group(1)
+    # Extract New Maturity Date
+    data['New Maturity Date'] = re.search(r'new maturity date of (\d{2}/\d{2}/\d{4})', text).group(1)
+    # Extract New Term
+    data['New Term'] = re.search(r'new maturity date of \d{2}/\d{2}/\d{4} with these terms:\nTerm : (\d+ Months?)', text).group(1)
+    # Extract New Interest Payment Frequency
+    data['New Interest Payment Frequency'] = re.search(r'Interest payment Frequency : (\w+ \w+)', text).group(1)
+    return data
+
+# Initialize an empty list to store the data
+all_data = []
+
+# Loop through all PDF files in the folder
+for file_name in os.listdir(folder_path):
+    if file_name.endswith('.pdf'):
+        file_path = os.path.join(folder_path, file_name)
+        with pdfplumber.open(file_path) as pdf:
+            text = ''
+            for page in pdf.pages:
+                text += page.extract_text()
+            data = extract_info(text)
+            data['File Name'] = file_name  # Add file name for differentiation
+            all_data.append(data)
+
+# Create a DataFrame from the collected data
+df = pd.DataFrame(all_data)
+
+# Save the DataFrame to an Excel file
+output_file = 'extracted_cd_info.xlsx'
+df.to_excel(output_file, index=False)
+
+print(f'Data extracted and saved to {output_file}')
