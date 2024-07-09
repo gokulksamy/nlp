@@ -1,32 +1,14 @@
-import pandas as pd
-import numpy as np
+import re
 
-# Sample dataframe
-data = {
-    'A': ['hello', np.nan, 'foo'],
-    'B': [np.nan, 'world', 'bar'],
-    'C': ['!', '!', '!']
-}
-df = pd.DataFrame(data)
+# Raw text
+raw_text = '-5.05 100p078.15'
 
-# Print the original dataframe
-print("Original DataFrame:")
-print(df)
+# Extract the numerical part using regex
+num_str = re.findall(r'\d+\.?\d*', raw_text)
+formatted_number = ''.join(num_str)
 
-# Get the first two rows
-row1 = df.iloc[0]
-row2 = df.iloc[1]
+# Convert to float and format with commas and dollar sign
+formatted_number = float(formatted_number)
+formatted_number_str = "${:,.2f}".format(formatted_number)
 
-# Concatenate the strings, handling NaN values
-concatenated_row = row1.combine_first(row2)
-concatenated_row = concatenated_row.fillna('') + row2.fillna('')
-
-# Replace the first row with the concatenated result
-df.iloc[0] = concatenated_row
-
-# Drop the second row
-df = df.drop(1).reset_index(drop=True)
-
-# Print the modified dataframe
-print("\nModified DataFrame:")
-print(df)
+print(formatted_number_str)
