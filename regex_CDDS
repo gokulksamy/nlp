@@ -1,14 +1,18 @@
-import re
+import pdfplumber
 
-# Raw text
-raw_text = '-5.05 100p078.15'
+def find_last_page_with_interest_statement(pdf_path):
+    last_page_with_interest_statement = -1
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_number, page in enumerate(pdf.pages):
+            text = page.extract_text()
+            if text and "Interest Statement" in text:
+                last_page_with_interest_statement = page_number + 1  # Page numbers are 1-indexed
+    return last_page_with_interest_statement
 
-# Extract the numerical part using regex
-num_str = re.findall(r'\d+\.?\d*', raw_text)
-formatted_number = ''.join(num_str)
-
-# Convert to float and format with commas and dollar sign
-formatted_number = float(formatted_number)
-formatted_number_str = "${:,.2f}".format(formatted_number)
-
-print(formatted_number_str)
+# Replace 'your_pdf_file.pdf' with the path to your PDF file
+pdf_path = 'your_pdf_file.pdf'
+last_page = find_last_page_with_interest_statement(pdf_path)
+if last_page != -1:
+    print(f"The last page with 'Interest Statement' is page {last_page}.")
+else:
+    print("The phrase 'Interest Statement' was not found in the document.")
