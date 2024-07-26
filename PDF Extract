@@ -1,72 +1,23 @@
-import re
-import pdfplumber
-import pandas as pd
+import pytesseract
+from pdf2image import convert_from_path
 
-# Function to extract information based on the description
-def extract_info(description):
-    # Extract Sub/Non Sub
-    if "Subsidized" in description:
-        sub_non_sub = "Subsidized"
-    elif "Non-Subsidized" in description:
-        sub_non_sub = "Non Subsidized"
-    else:
-        sub_non_sub = "Not Extracted"
+# Path to the Tesseract executable
+pytesseract.pytesseract.tesseract_cmd = r'/path/to/tesseract.exe'  # Update this path
 
-    # Extract Program Type
-    if "Low rate Program" in description:
-        program_type = "Low rate"
-    else:
-        program_type = "Not Extracted"
+def extract_text_from_scanned_pdf(pdf_path):
+    # Convert PDF to images
+    images = convert_from_path(pdf_path)
 
-    # Extract Program Location
-    match = re.search(r'(\d{2}MY.*?)(?=[ .,]|$)', description)
-    program_location = match.group(0) if match else "Not Extracted"
+    # Initialize text variable
+    text = ""
 
-    # Extract Dates
-    date_match = re.search(r'(\w+ \d{1,2}, \d{4}) - (\w+ \d{1,2}, \d{4})', description)
-    if date_match:
-        start_date = date_match.group(1)
-        end_date = date_match.group(2)
-    else:
-        start_date = end_date = "Not Extracted"
+    # Perform OCR on each image
+    for image in images:
+        text += pytesseract.image_to_string(image)
 
-    return sub_non_sub, program_type, program_location, start_date, end_date
+    return text
 
-# Path to the PDF file
-pdf_path = '/mnt/data/your_pdf_file.pdf'
-
-# Initialize an empty DataFrame to store all tables
-all_tables = pd.DataFrame()
-
-with pdfplumber.open(pdf_path) as pdf:
-    for page in pdf.pages:
-        # Extract the text from the page
-        text = page.extract_text()
-        
-        # Find the tables on the page
-        tables = page.extract_tables()
-
-        # Process each table
-        for table in tables:
-            # Convert the table to a DataFrame
-            df = pd.DataFrame(table[1:], columns=table[0])
-            
-            # Extract the description before the table
-            # Assuming the description is the last paragraph of text before the table
-            description = text.split('\n')[-len(table) - 1]
-            
-            # Extract the additional columns based on the description
-            sub_non_sub, program_type, program_location, start_date, end_date = extract_info(description)
-            
-            # Add the additional columns to the DataFrame
-            df['Sub/Non Sub'] = sub_non_sub
-            df['Program Type'] = program_type
-            df['Program Location'] = program_location
-            df['Start Date'] = start_date
-            df['End Date'] = end_date
-            
-            # Append the DataFrame to the list of all tables
-            all_tables = pd.concat([all_tables, df], ignore_index=True)
-
-# Save the final table to a CSV file
-all_tables.to_csv('/mnt/data/extracted_tables.csv', index=False)
+# Example usage
+pdf_path = 'path/to/scanned.pdf'  # Update this path
+extracted_text = extract_text_from_scanned_pdf(pdf_path)
+print(extracted_text)
