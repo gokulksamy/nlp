@@ -1,22 +1,23 @@
-import spacy
+from transformers import pipeline
 
-# Load the spaCy model
-nlp = spacy.load("en_core_web_sm")
+# Load the NER pipeline
+ner_pipeline = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english")
 
 # Example sentence
-sentence = "Our project with Acme Corp in Germany is progressing well."
+sentence = "Our project with Acme Corp in Cayman Islands is progressing well."
 
-# Process the sentence with spaCy
-doc = nlp(sentence)
+# Get named entities
+entities = ner_pipeline(sentence)
 
 client_name = None
 country_name = None
 
-for entity in doc.ents:
-    if entity.label_ in ("ORG", "PERSON"):  # Client name could be an organization or a person
-        client_name = entity.text
-    elif entity.label_ == "GPE":  # Country names are typically labeled as GPE (Geopolitical entity)
-        country_name = entity.text
+# Process the entities to extract client and country names
+for entity in entities:
+    if entity['entity_group'] == 'ORG':  # Client name could be an organization
+        client_name = entity['word']
+    elif entity['entity_group'] == 'LOC':  # Country names might be labeled as LOC (location)
+        country_name = entity['word']
 
 print(f"Client Name: {client_name}")
 print(f"Country Name: {country_name}")
