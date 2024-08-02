@@ -1,0 +1,22 @@
+import spacy
+
+# Load the spaCy model
+nlp = spacy.load("en_core_web_sm")
+
+# Example sentence
+sentence = "Our project with Acme Corp in Germany is progressing well."
+
+# Process the sentence with spaCy
+doc = nlp(sentence)
+
+client_name = None
+country_name = None
+
+for entity in doc.ents:
+    if entity.label_ in ("ORG", "PERSON"):  # Client name could be an organization or a person
+        client_name = entity.text
+    elif entity.label_ == "GPE":  # Country names are typically labeled as GPE (Geopolitical entity)
+        country_name = entity.text
+
+print(f"Client Name: {client_name}")
+print(f"Country Name: {country_name}")
