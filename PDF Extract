@@ -1,23 +1,33 @@
-import pytesseract
-from pdf2image import convert_from_path
+import os
+import pandas as pd
 
-# Path to the Tesseract executable
-pytesseract.pytesseract.tesseract_cmd = r'/path/to/tesseract.exe'  # Update this path
+# Function to extract information from a PDF and return it as a dictionary
+def extract_info_from_pdf(pdf_path):
+    # Your existing code to extract info from a single PDF
+    # Return the extracted information as a dictionary
+    extracted_data = {}
+    # Example structure of extracted data
+    # extracted_data = {'key1': 'value1', 'key2': 'value2'}
+    return extracted_data
 
-def extract_text_from_scanned_pdf(pdf_path):
-    # Convert PDF to images
-    images = convert_from_path(pdf_path)
+# Directory containing PDF files
+pdf_dir = 'path_to_your_pdf_folder'
 
-    # Initialize text variable
-    text = ""
+# List to store all extracted data
+all_data = []
 
-    # Perform OCR on each image
-    for image in images:
-        text += pytesseract.image_to_string(image)
+# Loop through all PDF files in the folder
+for filename in os.listdir(pdf_dir):
+    if filename.endswith('.pdf'):
+        pdf_path = os.path.join(pdf_dir, filename)
+        extracted_data = extract_info_from_pdf(pdf_path)
+        all_data.append(extracted_data)
 
-    return text
+# Convert the list of dictionaries to a DataFrame
+df = pd.DataFrame(all_data)
 
-# Example usage
-pdf_path = 'path/to/scanned.pdf'  # Update this path
-extracted_text = extract_text_from_scanned_pdf(pdf_path)
-print(extracted_text)
+# Save the DataFrame as a CSV file
+output_csv_path = 'output.csv'
+df.to_csv(output_csv_path, index=False)
+
+print(f'Extracted data has been saved to {output_csv_path}')
