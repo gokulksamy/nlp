@@ -1,0 +1,18 @@
+import pytesseract
+from PIL import Image
+
+# Load the image from the PDF (assuming you have converted the PDF page to an image)
+image_path = 'path_to_your_image.png'
+image = Image.open(image_path)
+
+# Define bounding box coordinates (x, y, width, height)
+bounding_box = (x1, y1, x2, y2)  # Replace with your actual bounding box values
+
+# Crop the image to the bounding box
+cropped_image = image.crop(bounding_box)
+
+# Perform OCR on the cropped image
+text = pytesseract.image_to_string(cropped_image)
+
+# Output the extracted text
+print(text)
