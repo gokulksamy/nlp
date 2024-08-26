@@ -4,24 +4,37 @@ import numpy as np
 # Read the image
 img = cv2.imread('path_to_image.jpg')
 
-# Convert the image to the LAB color space
-lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+# Convert to grayscale
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# Split the LAB image to different channels
-l, a, b = cv2.split(lab)
+# Noise removal with GaussianBlur
+blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-# Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to the L-channel
-clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-l_clahe = clahe.apply(l)
+# Apply thresholding
+_, binary = cv2.threshold(blurred, 150, 255, cv2.THRESH_BINARY_INV)
 
-# Merge the CLAHE enhanced L-channel with the a and b channel
-lab_clahe = cv2.merge((l_clahe,a,b))
+# Remove noise using morphological operations
+kernel = np.ones((1, 1), np.uint8)
+denoised = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-# Convert LAB image back to BGR color space
-img_clahe = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
+# Deskew the image
+coords = np.column_stack(np.where(denoised > 0))
+angle = cv2.minAreaRect(coords)[-1]
+if angle < -45:
+    angle = -(90 + angle)
+else:
+    angle = -angle
 
-# Save or display the enhanced image
-cv2.imwrite('enhanced_image.jpg', img_clahe)
-cv2.imshow('Enhanced Image', img_clahe)
+(h, w) = img.shape[:2]
+center = (w // 2, h // 2)
+M = cv2.getRotationMatrix2D(center, angle, 1.0)
+deskewed = cv2.warpAffine(denoised, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
+# Resize the image
+resized = cv2.resize(deskewed, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
+
+# Save or display the processed image
+cv2.imwrite('preprocessed_image.jpg', resized)
+cv2.imshow('Preprocessed Image', resized)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
