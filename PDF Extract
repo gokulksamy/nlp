@@ -1,33 +1,27 @@
-import os
-import pandas as pd
+import cv2
+import numpy as np
 
-# Function to extract information from a PDF and return it as a dictionary
-def extract_info_from_pdf(pdf_path):
-    # Your existing code to extract info from a single PDF
-    # Return the extracted information as a dictionary
-    extracted_data = {}
-    # Example structure of extracted data
-    # extracted_data = {'key1': 'value1', 'key2': 'value2'}
-    return extracted_data
+# Read the image
+img = cv2.imread('path_to_image.jpg')
 
-# Directory containing PDF files
-pdf_dir = 'path_to_your_pdf_folder'
+# Convert the image to the LAB color space
+lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
-# List to store all extracted data
-all_data = []
+# Split the LAB image to different channels
+l, a, b = cv2.split(lab)
 
-# Loop through all PDF files in the folder
-for filename in os.listdir(pdf_dir):
-    if filename.endswith('.pdf'):
-        pdf_path = os.path.join(pdf_dir, filename)
-        extracted_data = extract_info_from_pdf(pdf_path)
-        all_data.append(extracted_data)
+# Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to the L-channel
+clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+l_clahe = clahe.apply(l)
 
-# Convert the list of dictionaries to a DataFrame
-df = pd.DataFrame(all_data)
+# Merge the CLAHE enhanced L-channel with the a and b channel
+lab_clahe = cv2.merge((l_clahe,a,b))
 
-# Save the DataFrame as a CSV file
-output_csv_path = 'output.csv'
-df.to_csv(output_csv_path, index=False)
+# Convert LAB image back to BGR color space
+img_clahe = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
 
-print(f'Extracted data has been saved to {output_csv_path}')
+# Save or display the enhanced image
+cv2.imwrite('enhanced_image.jpg', img_clahe)
+cv2.imshow('Enhanced Image', img_clahe)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
