@@ -1,40 +1,18 @@
-import cv2
-import numpy as np
+def extract_name_and_country(input_string, predefined_countries):
+    # Sort the predefined countries by length in descending order to handle multi-word countries first
+    predefined_countries = sorted(predefined_countries, key=len, reverse=True)
+    
+    for country in predefined_countries:
+        if country in input_string:
+            # Split the string by the found country name
+            name = input_string.replace(country, "").strip()
+            return {"Name": name, "Country": country}
+    
+    return {"Name": None, "Country": None}
 
-# Read the image
-img = cv2.imread('path_to_image.jpg')
+# Example usage
+predefined_countries = ["United States", "Cayman Islands", "India", "United Kingdom", "Australia"]
+input_string = "fp Cayman Islands"
 
-# Convert to grayscale
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-# Noise removal with GaussianBlur
-blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-# Apply thresholding
-_, binary = cv2.threshold(blurred, 150, 255, cv2.THRESH_BINARY_INV)
-
-# Remove noise using morphological operations
-kernel = np.ones((1, 1), np.uint8)
-denoised = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-
-# Deskew the image
-coords = np.column_stack(np.where(denoised > 0))
-angle = cv2.minAreaRect(coords)[-1]
-if angle < -45:
-    angle = -(90 + angle)
-else:
-    angle = -angle
-
-(h, w) = img.shape[:2]
-center = (w // 2, h // 2)
-M = cv2.getRotationMatrix2D(center, angle, 1.0)
-deskewed = cv2.warpAffine(denoised, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-
-# Resize the image
-resized = cv2.resize(deskewed, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
-
-# Save or display the processed image
-cv2.imwrite('preprocessed_image.jpg', resized)
-cv2.imshow('Preprocessed Image', resized)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+result = extract_name_and_country(input_string, predefined_countries)
+print(result)
