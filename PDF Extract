@@ -2,17 +2,21 @@ def extract_name_and_country(input_string, predefined_countries):
     # Sort the predefined countries by length in descending order to handle multi-word countries first
     predefined_countries = sorted(predefined_countries, key=len, reverse=True)
     
+    last_found_country = None
     for country in predefined_countries:
         if country in input_string:
-            # Split the string by the found country name
-            name = input_string.replace(country, "").strip()
-            return {"Name": name, "Country": country}
+            last_found_country = country
+    
+    if last_found_country:
+        # Split the string by the last found country name
+        name = input_string.replace(last_found_country, "").strip()
+        return {"Name": name, "Country": last_found_country}
     
     return {"Name": None, "Country": None}
 
 # Example usage
 predefined_countries = ["United States", "Cayman Islands", "India", "United Kingdom", "Australia"]
-input_string = "fp Cayman Islands"
+input_string = "fp Cayman Islands United States"
 
 result = extract_name_and_country(input_string, predefined_countries)
 print(result)
