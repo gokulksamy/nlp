@@ -1,22 +1,135 @@
-def extract_name_and_country(input_string, predefined_countries):
-    # Sort the predefined countries by length in descending order to handle multi-word countries first
-    predefined_countries = sorted(predefined_countries, key=len, reverse=True)
+import requests
+from bs4 import BeautifulSoup
+
+def get_google_results(query, num_results=20):
+    # Format the query for Google search
+    query = query.replace(' ', '+')
+    google_url = f"https://www.google.com/search?q={query}&num={num_results}"
+
+    # Set up headers to mimic a browser request
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    }
+
+    # Send the GET request to Google
+    response = requests.get(google_url, headers=headers)
+
+    if response.status_code != 200:
+        print(f"Error: Unable to fetch search results, status code {response.status_code}")
+        return []
+
+    # Parse the response content
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = []
+
+    # Extract links from the search results
+    for a in soup.find_all('a', href=True):
+        #print(a)
+        #print('*'*10)
+        link = a['href']
+        #print(link)
+        #print('*'*10)
+        # Google search results have URLs formatted as "/url?q=<actual_url>&..."
+        if link.startswith('/url?'):
+            # Extract the actual URL from the query parameter
+            url = link.split('url=')[1].split('&')[0]
+            #print(url)
+            results.append(url)
+
+        # Stop after collecting the desired number of results
+        if len(results) >= num_results:
+            break
+
+    return results
+
+
+def sublinks(url):
+    # Send a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Parse the content of the page with BeautifulSoup
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Find all links on the page
+        links = soup.find_all("a")
+
+        # Extract and print the sub-links
+        sub_links = []
+        for link in links:
+            href = link.get("href")
+            if href and href.startswith("/"):  # Check for relative URLs
+                full_link = requests.compat.urljoin(url, href)  # Create full URL
+                sub_links.append(full_link)
+
+        # Print the extracted sub-links
+        for sub_link in sub_links:
+            print(sub_link)
+    else:
+        print(f"Failed to retrieve the webpage. Status code: {response.status_code}")
+
     
-    last_found_country = None
-    for country in predefined_countries:
-        if country in input_string:
-            last_found_country = country
-    
-    if last_found_country:
-        # Split the string by the last found country name
-        name = input_string.replace(last_found_country, "").strip()
-        return {"Name": name, "Country": last_found_country}
-    
-    return {"Name": None, "Country": None}
+def content(url):
+
+    # Send a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Parse the content of the page with BeautifulSoup
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Extract the main content from the page
+        # This can be adjusted based on the specific HTML structure
+        # You might want to inspect the page to find the right tags
+        content = soup.find_all(["h1", "h2", "h3", "p"])  # Example tags to extract
+
+        # Print the extracted content
+        for element in content:
+            print(element.get_text(strip=True))
+
+    else:
+        print(f"Failed to retrieve the webpage. Status code: {response.status_code}")
 
 # Example usage
-predefined_countries = ["United States", "Cayman Islands", "India", "United Kingdom", "Australia"]
-input_string = "fp Cayman Islands United States"
+query = "Wipro annual reoprt"
+top20_links = get_google_results(query)
 
-result = extract_name_and_country(input_string, predefined_countries)
-print(result)
+for index, link in enumerate(top20_links, start=1):
+    print(f"{index}: {link}")
+
+def pdf_links(url):
+    #Send a GET request to the URL
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        # Parse the content of the page with BeautifulSoup
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Find all links on the page
+        links = soup.find_all("a")
+
+        # Extract PDF links
+        pdf_links = []
+        for link in links:
+            href = link.get("href")
+            if href and href.endswith(".pdf"):  # Check if the link ends with .pdf
+                # Make sure to create a full URL if the link is relative
+                full_link = requests.compat.urljoin(url, href)
+                pdf_links.append(full_link)
+
+        # Print the extracted PDF links
+        for pdf_link in pdf_links:
+            print(pdf_link)
+    else:
+        print(f"Failed to retrieve the webpage. Status code: {response.status_code}")
+# Example usage
+query = "toyo-tos annual reoprt"
+top20_links = get_google_results(query)
+
+for index, link in enumerate(top20_links, start=1):
+    print(f"{index}: {link}")
+print ("***********************************************")
+#pdf_links('https://www.toyo-eng.com/jp/en/investors/annualreport/')
