@@ -1,37 +1,40 @@
-import pandas as pd
-import json
+import sys
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 
-def preprocess_json(data):
-    # Flatten the JSON if there are nested structures
-    try:
-        data = pd.json_normalize(data)
-    except Exception as e:
-        print(f"Error in normalizing JSON: {e}")
-        return None
-    return data
+class PDFViewer(QMainWindow):
+    def __init__(self, pdf_url):
+        super(PDFViewer, self).__init__()
+        self.setWindowTitle("PDF Viewer")
+        self.setGeometry(100, 100, 800, 600)
 
-# Read JSON file
-json_file_path = 'data.json'
-try:
-    with open(json_file_path) as f:
-        data = json.load(f)
-except ValueError as e:
-    print(f"Error reading JSON file: {e}")
-    data = None
+        # Create a QWebEngineView to display the PDF
+        self.web_view = QWebEngineView()
 
-if data is not None:
-    # Preprocess JSON data
-    data = preprocess_json(data)
-    
-    if data is not None:
-        # Write to Excel file
-        excel_file_path = 'data.xlsx'
-        try:
-            data.to_excel(excel_file_path, index=False)
-            print(f'JSON data has been written to {excel_file_path}')
-        except ValueError as e:
-            print(f"Error writing to Excel: {e}")
-    else:
-        print("Preprocessed data is None, check the JSON structure.")
-else:
-    print("Data is None, check the JSON file.")
+        # Enable the built-in PDF viewer settings
+        settings = self.web_view.settings()
+        settings.setAttribute(QWebEngineSettings.PluginsEnabled, True)
+        settings.setAttribute(QWebEngineSettings.PdfViewerEnabled, True)
+        
+        # Load the PDF from the given URL
+        self.web_view.load(QUrl(pdf_url))
+
+        # Create a central widget and set the layout
+        central_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.web_view)
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    # Provide the URL to the PDF file here
+    pdf_url = "https://www.cisco.com/c/dam/en_us/about/annual-report/cisco-annual-report-2022.pdf"
+
+    # Create and show the PDF viewer
+    viewer = PDFViewer(pdf_url)
+    viewer.show()
+
+    sys.exit(app.exec_())
